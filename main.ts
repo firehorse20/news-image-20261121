@@ -1,11 +1,25 @@
-// A working news-image-daily entry (Node 22, standard library only): its image is the entry.png beside this file, and
-// the program copies it to /output/entry.png. A starting point, not a winner: replace the image. The gate takes a
-// whole PNG or JPEG of at most 1 MiB and 1024 by 1024 pixels, and the judge sees exactly the bytes copied.
-//
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+import { copyFileSync, existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { copyFileSync } from 'node:fs';
-import { join } from 'node:path';
+const here = dirname(fileURLToPath(import.meta.url));
+const source = join(here, 'entry.png');
+const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+const target = join(outDir, 'entry.png');
 
-copyFileSync(new URL('./entry.png', import.meta.url), join(process.env.MAKEFUN_OUTPUT_DIR ?? '/output', 'entry.png'));
+if (!existsSync(source)) {
+  console.error(`news-image-20261121: entry.png is missing beside main.ts (${source})`);
+  process.exit(1);
+}
+
+mkdirSync(outDir, { recursive: true });
+// Copy to a temp file and rename, so a partial write never leaves a
+// corrupt entry.png behind; then confirm the output is really there.
+const temp = join(outDir, `.entry.png.tmp-${process.pid}`);
+copyFileSync(source, temp);
+renameSync(temp, target);
+const bytes = statSync(target).size;
+if (bytes === 0) {
+  console.error('news-image-20261121: entry.png was written empty');
+  process.exit(1);
+}
